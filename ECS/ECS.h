@@ -3,7 +3,6 @@
 #define _ECS_H_
 #include <vector>
 #include <memory>
-#include <type_traits>
 
 namespace ECS {
 	class Entity;
