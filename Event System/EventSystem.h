@@ -2,6 +2,7 @@
 #ifndef _EVENTSYSTEM_H_
 #define _EVENTSYSTEM_H_
 #include <list>
+#include <memory>
 #include <type_traits>
 #include <functional>
 
