@@ -40,7 +40,7 @@ namespace ECS {
 	protected:
 		ComponentsArray _components;
 	public:
-		Entity() = default;
+		Entity();
 		Entity(const Entity& other);
 		Entity(Entity&& other) noexcept;
 

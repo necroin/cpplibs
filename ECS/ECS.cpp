@@ -14,6 +14,8 @@ namespace ECS {
 
 	void Component::update() {}
 
+	Entity::Entity() : _components(0) {}
+
 	Entity::Entity(const Entity& other)
 	{
 		_components.reserve(other._components.size());
