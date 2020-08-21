@@ -8,11 +8,75 @@
 
 namespace EventSystem {
 	namespace detail {
+		namespace strip {
+			template<class _Functor>
+			struct __strip_signature;
+
+			template<class _Result, class _Object, class ..._Args>
+			struct __strip_signature<_Result(_Object::*) (_Args...)> { using type = _Result(_Object::*)(_Args...); };
+			template<class _Result, class _Object, class ..._Args>
+			struct __strip_signature<_Result(_Object::*) (_Args...) const> { using type = _Result(_Object::*)(_Args...); };
+			template<class _Result, class _Object, class ..._Args>
+			struct __strip_signature<_Result(_Object::*) (_Args...) volatile> { using type = _Result(_Object::*)(_Args...); };
+			template<class _Result, class _Object, class ..._Args>
+			struct __strip_signature<_Result(_Object::*) (_Args...) const volatile> { using type = _Result(_Object::*)(_Args...); };
+
+			template<class _Result, class _Object, class ..._Args>
+			struct __strip_signature<_Result(_Object::*) (_Args...)&> { using type = _Result(_Object::*)(_Args...); };
+			template<class _Result, class _Object, class ..._Args>
+			struct __strip_signature<_Result(_Object::*) (_Args...) const&> { using type = _Result(_Object::*)(_Args...); };
+			template<class _Result, class _Object, class ..._Args>
+			struct __strip_signature<_Result(_Object::*) (_Args...) volatile&> { using type = _Result(_Object::*)(_Args...); };
+			template<class _Result, class _Object, class ..._Args>
+			struct __strip_signature<_Result(_Object::*) (_Args...) const volatile&> { using type = _Result(_Object::*)(_Args...); };
+
+			template<class _Result, class _Object, class ..._Args>
+			struct __strip_signature<_Result(_Object::*) (_Args...)&&> { using type = _Result(_Object::*)(_Args...); };
+			template<class _Result, class _Object, class ..._Args>
+			struct __strip_signature<_Result(_Object::*) (_Args...) const&&> { using type = _Result(_Object::*)(_Args...); };
+			template<class _Result, class _Object, class ..._Args>
+			struct __strip_signature<_Result(_Object::*) (_Args...) volatile&&> { using type = _Result(_Object::*)(_Args...); };
+			template<class _Result, class _Object, class ..._Args>
+			struct __strip_signature<_Result(_Object::*) (_Args...) const volatile&&> { using type = _Result(_Object::*)(_Args...); };
+
+#if _HAS_CXX17
+			template<class _Result, class _Object, class ..._Args>
+			struct __strip_signature<_Result(_Object::*) (_Args...) noexcept> { using type = _Result(_Object::*)(_Args...); };
+			template<class _Result, class _Object, class ..._Args>
+			struct __strip_signature<_Result(_Object::*) (_Args...) const noexcept> { using type = _Result(_Object::*)(_Args...); };
+			template<class _Result, class _Object, class ..._Args>
+			struct __strip_signature<_Result(_Object::*) (_Args...) volatile noexcept> { using type = _Result(_Object::*)(_Args...); };
+			template<class _Result, class _Object, class ..._Args>
+			struct __strip_signature<_Result(_Object::*) (_Args...) const volatile noexcept> { using type = _Result(_Object::*)(_Args...); };
+			template<class _Result, class _Object, class ..._Args>
+			struct __strip_signature<_Result(_Object::*) (_Args...) & noexcept> { using type = _Result(_Object::*)(_Args...); };
+			template<class _Result, class _Object, class ..._Args>
+			struct __strip_signature<_Result(_Object::*) (_Args...) const& noexcept> { using type = _Result(_Object::*)(_Args...); };
+			template<class _Result, class _Object, class ..._Args>
+			struct __strip_signature<_Result(_Object::*) (_Args...) volatile& noexcept> { using type = _Result(_Object::*)(_Args...); };
+			template<class _Result, class _Object, class ..._Args>
+			struct __strip_signature<_Result(_Object::*) (_Args...) const volatile& noexcept> { using type = _Result(_Object::*)(_Args...); };
+#endif
+
+			template<class _Functor>
+			using __strip_signature_t = typename __strip_signature<_Functor>::type;
+		}
+	}
+}
+
+namespace EventSystem {
+	namespace detail {
 		template<class... _Args>
 		struct pack {};
 
 		template<class... _Args>
 		struct get_function_args;
+
+		template<class _Return, class _Object, class... _Args>
+		struct get_function_args<_Return(_Object::*)(_Args...)> {
+			using args_pack = pack<_Args...>;
+			using return_type = _Return;
+		};
 
 		template<class _Return, class... _Args>
 		struct get_function_args<std::function<_Return(_Args...)>> {
@@ -60,48 +124,23 @@ namespace EventSystem {
 			}
 		};
 
-		template<class _Unused>
+		template<class... _Unused>
 		class MethodEventHandler;
 
-		template<class _Object, class _Return, class... _Args>
-		class MethodEventHandler<_Return(_Object::*)(_Args...)> :
+		template<class _Method, class _Object, class _Return, class... _Args>
+		class MethodEventHandler<_Method, _Return(_Object::*)(_Args...)> :
 			public AbstractEventHandler<_Args...>
 		{
 		private:
-			using __Method = _Return(_Object::*)(_Args...);
 			_Object& _object;
-			__Method _method;
+			_Method _method;
 		protected:
 			virtual bool is_equals(const AbstractEventHandler<_Args...>& other) const override final {
 				decltype(this) other_ptr = dynamic_cast<decltype(this)>(&other);
 				return  other_ptr != nullptr && &_object == &other_ptr->_object && _method == other_ptr->_method;
 			}
 		public:
-			MethodEventHandler(_Object& object, __Method method) : _object(object), _method(method) {
-				if (_method == nullptr) throw std::exception("Undefined method");
-			}
-
-			virtual void call(_Args&... args) override final {
-				(_object.*_method)(args...);
-			}
-		};
-
-
-		template<template<class...> class _Object, class _Return, class... _Args, class... _ObjectArgs>
-		class MethodEventHandler<_Return(_Object<_ObjectArgs...>::*)(_Args...)> :
-			public AbstractEventHandler<_Args...>
-		{
-		private:
-			using __Method = _Return(_Object<_ObjectArgs...>::*)(_Args...);
-			_Object<_ObjectArgs...>& _object;
-			__Method _method;
-		protected:
-			virtual bool is_equals(const AbstractEventHandler<_Args...>& other) const override final {
-				decltype(this) other_ptr = dynamic_cast<decltype(this)>(&other);
-				return other_ptr != nullptr && &_object == &other_ptr->_object && _method == other_ptr->_method;
-			}
-		public:
-			MethodEventHandler(_Object<_ObjectArgs...>& object, __Method method) : _object(object), _method(method) {
+			MethodEventHandler(_Object& object, _Method method) : _object(object), _method(method) {
 				if (_method == nullptr) throw std::exception("Undefined method");
 			}
 
@@ -113,12 +152,16 @@ namespace EventSystem {
 
 	template<class _FunctorHandler>
 	decltype(auto) createFunctorEventHandler(_FunctorHandler&& functor_handler) {
+#if _HAS_CXX17
 		return std::make_shared<handlers::FunctorEventHandler<std::remove_reference_t<_FunctorHandler>, typename detail::get_function_args<decltype(std::function(functor_handler))>::args_pack>>(std::forward<_FunctorHandler>(functor_handler));
+#else
+		return std::make_shared<handlers::FunctorEventHandler<std::remove_reference_t<_FunctorHandler>, typename detail::get_function_args<detail::strip::__strip_signature_t<decltype(&_FunctorHandler::operator())>>::args_pack>>(std::forward<_FunctorHandler>(functor_handler));
+#endif
 	}
 
 	template<class _Object, class _Method>
 	decltype(auto) createMethodEventHandler(_Object& object ,_Method&& method) {
-		return std::make_shared<handlers::MethodEventHandler<std::remove_reference_t<_Method>>>(object, method);
+		return std::make_shared<handlers::MethodEventHandler<_Method, detail::strip::__strip_signature_t<_Method>>>(object, method);
 	}
 
 	template<class... _Args>
