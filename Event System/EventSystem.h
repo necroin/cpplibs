@@ -3,6 +3,8 @@
 #define _EVENTSYSTEM_H_
 #include <list>
 #include <functional>
+#include <memory>
+#include <type_traits>
 
 namespace EventSystem {
 	namespace detail {
@@ -11,12 +13,6 @@ namespace EventSystem {
 
 		template<class... _Args>
 		struct get_function_args;
-
-		template<class _Return, class... _Args>
-		struct get_function_args<_Return(_Args...)> {
-			using args_pack = pack<_Args...>;
-			using return_type = _Return;
-		};
 
 		template<class _Return, class... _Args>
 		struct get_function_args<std::function<_Return(_Args...)>> {
@@ -77,8 +73,8 @@ namespace EventSystem {
 			__Method _method;
 		protected:
 			virtual bool is_equals(const AbstractEventHandler<_Args...>& other) const override final {
-				decltype(this) other_p = dynamic_cast<decltype(this)>(&other);
-				return  other_p != nullptr && &_object == &other_p->_object && _method == other_p->_method;
+				decltype(this) other_ptr = dynamic_cast<decltype(this)>(&other);
+				return  other_ptr != nullptr && &_object == &other_ptr->_object && _method == other_ptr->_method;
 			}
 		public:
 			MethodEventHandler(_Object& object, __Method method) : _object(object), _method(method) {
@@ -101,8 +97,8 @@ namespace EventSystem {
 			__Method _method;
 		protected:
 			virtual bool is_equals(const AbstractEventHandler<_Args...>& other) const override final {
-				decltype(this) other_p = dynamic_cast<decltype(this)>(&other);
-				return other_p != nullptr && &_object == &other_p->_object && _method == other_p->_method;
+				decltype(this) other_ptr = dynamic_cast<decltype(this)>(&other);
+				return other_ptr != nullptr && &_object == &other_ptr->_object && _method == other_ptr->_method;
 			}
 		public:
 			MethodEventHandler(_Object<_ObjectArgs...>& object, __Method method) : _object(object), _method(method) {
@@ -117,12 +113,12 @@ namespace EventSystem {
 
 	template<class _FunctorHandler>
 	decltype(auto) createFunctorEventHandler(_FunctorHandler&& functor_handler) {
-		return std::make_shared<handlers::FunctorEventHandler<_FunctorHandler, typename detail::get_function_args<decltype(std::function(functor_handler))>::args_pack>>(std::forward<_FunctorHandler>(functor_handler));
+		return std::make_shared<handlers::FunctorEventHandler<std::remove_reference_t<_FunctorHandler>, typename detail::get_function_args<decltype(std::function(functor_handler))>::args_pack>>(std::forward<_FunctorHandler>(functor_handler));
 	}
 
 	template<class _Object, class _Method>
-	decltype(auto) createMethodEventHandler(_Object&& object ,_Method&& method) {
-		return std::make_shared<handlers::MethodEventHandler<_Method>>(object, method);
+	decltype(auto) createMethodEventHandler(_Object& object ,_Method&& method) {
+		return std::make_shared<handlers::MethodEventHandler<std::remove_reference_t<_Method>>>(object, method);
 	}
 
 	template<class... _Args>
