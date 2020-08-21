@@ -2,8 +2,9 @@
 #ifndef _FINITE_STATE_MACHINE_
 #define _FINITE_STATE_MACHINE_
 #include <list>
-#include <memory>
 #include <functional>
+#include <memory>
+#include <type_traits>
 
 namespace FSM::detail {
 	template<class... _Args>
@@ -12,25 +13,11 @@ namespace FSM::detail {
 	template<class... _Args>
 	struct get_functor_args;
 
-	template<class _Return, class... _Args>
-	struct get_functor_args<_Return(_Args...)> {
-		using args_pack = pack<_Args...>;
-		using return_type = _Return;
-	};
-
 	template<class _Return,class... _Args>
 	struct get_functor_args<std::function<_Return(_Args...)>> {
 		using args_pack = pack<_Args...>;
 		using return_type = _Return;
 	};
-
-	template<class _Return, class... _Args>
-	auto to_function(std::function<_Return(_Args...)>)->std::function<_Return(_Args...)>;
-
-	template<class _Functor>
-	auto get_functor_args_pack_f(_Functor&& functor)->typename get_functor_args<decltype(to_function(std::function(functor)))>::args_pack;
-
-
 
 	template<class... _Args>
 	struct args_count {
@@ -62,14 +49,15 @@ namespace FSM {
 	class Transition :
 		public AbstractTransition<_Input...>
 	{
+	private:
 		_FunctorHandler _handler;
 	public:
 		Transition(const _FunctorHandler& handler) : _handler(handler) {
-			static_assert(detail::args_count_v<_Input...> == detail::args_count_v<decltype(detail::get_functor_args_pack_f(handler))>,
+			static_assert(detail::args_count_v<_Input...> == detail::args_count_v<typename detail::get_functor_args<decltype(std::function(handler))>::args_pack>,
 			"The number of arguments in transition is not equal to the number of arguments of the state machine");
 		}
 		Transition(_FunctorHandler&& handler) : _handler(handler) {
-			static_assert(detail::args_count_v<_Input...> == detail::args_count_v<decltype(detail::get_functor_args_pack_f(handler))>,
+			static_assert(detail::args_count_v<_Input...> == detail::args_count_v<typename detail::get_functor_args<decltype(std::function(handler))>::args_pack>,
 			"The number of arguments in transition is not equal to the number of arguments of the state machine");
 		}
 		State<_Input...>* handle(_Input&... input) override {
@@ -102,8 +90,7 @@ namespace FSM {
 
 		template<class FunctorHandler>
 		void add_transition(FunctorHandler&& handler){
-			_transitions.emplace_back(std::move(std::make_unique<Transition<FunctorHandler, _Input...>>(std::forward<FunctorHandler>(handler))));
-
+			_transitions.emplace_back(std::move(std::make_unique<Transition<std::remove_reference_t<FunctorHandler>, _Input...>>(std::forward<FunctorHandler>(handler))));
 		}
 	};
 
